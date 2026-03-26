@@ -92,6 +92,8 @@ Sales-Intelligence-Tool/
 
 ## Planned Improvements
 
-- RAG support for internal documents — upload product one-pagers, battlecards, or architecture docs as seller context instead of relying solely on public website scraping
+- RAG pipeline for internal seller documents: upload product one-pagers, battlecards, or architecture docs as seller context instead of relying solely on public website scraping
+- Automated prospect document discovery: use Firecrawl's crawl mode to spider the prospect site, find linked whitepapers and technical PDFs, and feed them into the brief generation as richer context
+- Manual prospect document upload: allow SEs to upload RFPs, security questionnaires, or technical specs received from a prospect before the call, grounding the brief in the prospect's own language and priorities
 - React frontend for improved UI and mobile experience
 - Caching scraped content to reduce API calls on repeated prospects
