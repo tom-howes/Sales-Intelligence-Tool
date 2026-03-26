@@ -5,8 +5,19 @@ import anthropic
 
 load_dotenv()
 
-firecrawl = FirecrawlApp(api_key=os.getenv("FIRECRAWL_API_KEY"))
-claude = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+try:
+    import streamlit as st
+    ANTHROPIC_API_KEY = st.secrets["ANTHROPIC_API_KEY"]
+    FIRECRAWL_API_KEY = st.secrets["FIRECRAWL_API_KEY"]
+except Exception:
+    from dotenv import load_dotenv
+    load_dotenv()
+    ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+    FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY")
+
+
+firecrawl = FirecrawlApp(api_key=FIRECRAWL_API_KEY)
+claude = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
 SCRAPE_PATHS = ["", "/about", "/product", "/customers"]
 MAX_CHARS_PER_PAGE = 3000
