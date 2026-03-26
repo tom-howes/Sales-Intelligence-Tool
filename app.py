@@ -88,7 +88,11 @@ if generate:
         col_a, col_b = st.columns(2)
         with col_a:
             with st.spinner(f"Scraping {prospect_url}..."):
-                prospect_content = scrape_company(prospect_url, SCRAPE_PATHS, MAX_CHARS_PER_PAGE)
+                try:
+                    prospect_content = scrape_company(prospect_url, SCRAPE_PATHS, MAX_CHARS_PER_PAGE)
+                    st.write(f"Scraped {len(prospect_content)} chars")
+                except Exception as e:
+                    st.error(f"Scrape error: {e}")
         with col_b:
             with st.spinner(f"Scraping {selling_product}..."):
                 seller_content = scrape_company(seller_url, ["", "/product"], MAX_CHARS_SELLER)
