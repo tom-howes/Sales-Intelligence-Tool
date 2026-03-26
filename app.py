@@ -1,6 +1,8 @@
 import streamlit as st
 from pipeline import scrape_company, generate_brief, STAKEHOLDER_PERSONAS, SCRAPE_PATHS, MAX_CHARS_PER_PAGE, MAX_CHARS_SELLER
 
+st.write("Firecrawl key loaded:", bool(st.secrets.get("FIRECRAWL_API_KEY")))
+st.write("Anthropic key loaded:", bool(st.secrets.get("ANTHROPIC_API_KEY")))
 # --- Page config ---
 st.set_page_config(
     page_title="Sales Intelligence Tool",
