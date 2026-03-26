@@ -1,13 +1,12 @@
 import streamlit as st
 from pipeline import scrape_company, generate_brief, STAKEHOLDER_PERSONAS, SCRAPE_PATHS, MAX_CHARS_PER_PAGE, MAX_CHARS_SELLER
 
-st.write("Firecrawl key loaded:", bool(st.secrets.get("FIRECRAWL_API_KEY")))
-st.write("Anthropic key loaded:", bool(st.secrets.get("ANTHROPIC_API_KEY")))
 # --- Page config ---
 st.set_page_config(
     page_title="Sales Intelligence Tool",
     page_icon=None,
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="collapsed"
 )
 
 # --- Custom CSS ---
@@ -87,20 +86,18 @@ if generate:
     if not prospect_url or not selling_product or not seller_url:
         st.warning("Please fill in all fields before generating.")
     else:
-        col_a, col_b = st.columns(2)
-        with col_a:
-            with st.spinner(f"Scraping {prospect_url}..."):
-                try:
-                    prospect_content = scrape_company(prospect_url, SCRAPE_PATHS, MAX_CHARS_PER_PAGE)
-                    st.write(f"Scraped {len(prospect_content)} chars")
-                except Exception as e:
-                    st.error(f"Scrape error: {e}")
-        with col_b:
-            with st.spinner(f"Scraping {selling_product}..."):
-                seller_content = scrape_company(seller_url, ["", "/product"], MAX_CHARS_SELLER)
+        with st.spinner(f"Scraping prospect..."):
+            prospect_content = scrape_company(prospect_url, SCRAPE_PATHS, MAX_CHARS_PER_PAGE)
 
         if not prospect_content:
             st.error("Could not scrape the prospect URL. Check the URL and try again.")
+            st.stop()
+
+        with st.spinner(f"Scraping {selling_product}..."):
+            seller_content = scrape_company(seller_url, ["", "/product"], MAX_CHARS_SELLER)
+
+        if not seller_content:
+            st.error(f"Could not scrape {selling_product} URL. Check the URL and try again.")
             st.stop()
 
         with st.spinner("Generating brief..."):
