@@ -1,5 +1,9 @@
 import streamlit as st
-from pipeline import scrape_company, generate_brief, STAKEHOLDER_PERSONAS, SCRAPE_PATHS, MAX_CHARS_PER_PAGE, MAX_CHARS_SELLER
+import httpx
+
+BACKEND_URL = "http://localhost:8000"
+
+STAKEHOLDER_PERSONAS = ["CISO", "VP Engineering", "CFO"]
 
 # --- Page config ---
 st.set_page_config(
@@ -73,9 +77,36 @@ with col3:
 with col4:
     stakeholder = st.selectbox(
         "Stakeholder",
-        options=list(STAKEHOLDER_PERSONAS.keys()),
+        options=STAKEHOLDER_PERSONAS,
         index=1
     )
+
+uploaded_file = st.file_uploader(
+    "Upload internal seller documents (optional)",
+    type=["pdf", "txt"],
+    help="Upload battlecards, one-pagers, or architecture docs to enrich the brief."
+)
+
+if uploaded_file is not None:
+    if uploaded_file.file_id not in st.session_state.get("uploaded_file_ids", set()):
+        with st.spinner(f"Processing {uploaded_file.name}..."):
+            try:
+                response = httpx.post(
+                    f"{BACKEND_URL}/upload",
+                    files={"file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)},
+                    timeout=60,
+                )
+                response.raise_for_status()
+                data = response.json()
+                st.success(f"Uploaded **{data['filename']}** — {data['chunk_count']} chunks indexed.")
+                uploaded_ids = st.session_state.get("uploaded_file_ids", set())
+                uploaded_ids.add(uploaded_file.file_id)
+                st.session_state["uploaded_file_ids"] = uploaded_ids
+                st.session_state["docs_uploaded"] = True
+            except httpx.HTTPStatusError as e:
+                st.error(f"Upload failed: {e.response.json().get('detail', str(e))}")
+            except Exception as e:
+                st.error(f"Upload failed: {e}")
 
 generate = st.button("Generate Brief", type="primary", use_container_width=True)
 
@@ -86,28 +117,58 @@ if generate:
     if not prospect_url or not selling_product or not seller_url:
         st.warning("Please fill in all fields before generating.")
     else:
-        with st.spinner(f"Scraping prospect..."):
-            prospect_content = scrape_company(prospect_url, SCRAPE_PATHS, MAX_CHARS_PER_PAGE)
+        with st.spinner("Scraping prospect and seller websites..."):
+            try:
+                scrape_response = httpx.post(
+                    f"{BACKEND_URL}/scrape",
+                    json={"prospect_url": prospect_url, "seller_url": seller_url},
+                    timeout=120,
+                )
+                scrape_response.raise_for_status()
+                scraped = scrape_response.json()
+            except httpx.HTTPStatusError as e:
+                st.error(f"Scraping failed: {e.response.json().get('detail', str(e))}")
+                st.stop()
+            except Exception as e:
+                st.error(f"Scraping failed: {e}")
+                st.stop()
 
-        if not prospect_content:
-            st.error("Could not scrape the prospect URL. Check the URL and try again.")
-            st.stop()
-
-        with st.spinner(f"Scraping {selling_product}..."):
-            seller_content = scrape_company(seller_url, ["", "/product"], MAX_CHARS_SELLER)
-
-        if not seller_content:
-            st.error(f"Could not scrape {selling_product} URL. Check the URL and try again.")
-            st.stop()
+        rag_context = None
+        if st.session_state.get("docs_uploaded"):
+            with st.spinner("Retrieving relevant context from uploaded documents..."):
+                try:
+                    retrieve_response = httpx.post(
+                        f"{BACKEND_URL}/retrieve",
+                        json={"query": prospect_url, "k": 3},
+                        timeout=30,
+                    )
+                    retrieve_response.raise_for_status()
+                    rag_context = retrieve_response.json().get("chunks") or None
+                except Exception as e:
+                    st.warning(f"Could not retrieve document context: {e}")
 
         with st.spinner("Generating brief..."):
-            brief = generate_brief(
-                prospect_url,
-                prospect_content,
-                seller_content,
-                stakeholder,
-                selling_product
-            )
+            try:
+                generate_response = httpx.post(
+                    f"{BACKEND_URL}/generate",
+                    json={
+                        "prospect_url": prospect_url,
+                        "prospect_content": scraped["prospect_content"],
+                        "seller_content": scraped["seller_content"],
+                        "stakeholder": stakeholder,
+                        "selling_product": selling_product,
+                        "rag_context": rag_context,
+                    },
+                    timeout=60,
+                )
+                generate_response.raise_for_status()
+                brief = generate_response.json()["brief"]
+            except httpx.HTTPStatusError as e:
+                st.error(f"Brief generation failed: {e.response.json().get('detail', str(e))}")
+                st.stop()
+            except Exception as e:
+                st.error(f"Brief generation failed: {e}")
+                st.stop()
 
         st.session_state["brief"] = brief
         st.session_state["stakeholder"] = stakeholder
